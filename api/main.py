@@ -12,7 +12,9 @@ sys.path.insert(0, str(project_root))
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+import json
 
 from config.settings import settings
 from src.recommendation import RecommendationEngine
@@ -87,7 +89,7 @@ class RecommendationRequest(BaseModel):
         None, description="User context for personalization"
     )
     conversation_id: Optional[str] = Field(
-        None, description="Conversation ID for multi-turn dialogue (formerly thread_id)"
+        None, description="Conversation ID for multi-turn dialogue"
     )
 
 
@@ -100,6 +102,14 @@ class ModuleRecommendation(BaseModel):
     reason: str
 
 
+class UsageInfo(BaseModel):
+    """Token usage information."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
 class RecommendationResponse(BaseModel):
     """Response with recommendations."""
 
@@ -109,6 +119,7 @@ class RecommendationResponse(BaseModel):
     implementation_plan: str
     summary: Optional[str] = ""
     timestamp: str
+    usage: Optional[UsageInfo] = None
 
 
 class FeedbackRequest(BaseModel):
@@ -156,7 +167,7 @@ async def health():
 @app.post("/recommend", response_model=RecommendationResponse)
 async def get_recommendations(request: RecommendationRequest):
     """
-    Get personalized module recommendations.
+    Get personalized module recommendations (non-streaming).
 
     Steps:
     1. Extract intent from natural language query
@@ -174,7 +185,7 @@ async def get_recommendations(request: RecommendationRequest):
         if request.user_context:
             user_context_dict = request.user_context.model_dump(exclude_none=True)
 
-        # Get recommendations (using conversation_id instead of thread_id)
+        # ✅ SDK Pattern: Get recommendations with AgentRunResponse handling
         response = await recommendation_engine.get_recommendations_async(
             query=request.query,
             user_id=request.user_id,
@@ -185,6 +196,63 @@ async def get_recommendations(request: RecommendationRequest):
         return response
     except Exception as e:
         logger.error(f"Error processing recommendation request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/recommend/stream")
+async def get_recommendations_stream(request: RecommendationRequest):
+    """
+    Get personalized module recommendations with Server-Sent Events (SSE) streaming.
+
+    This endpoint uses the SDK's streaming capabilities (AgentRunResponseUpdate)
+    to provide real-time updates as the agent processes the request.
+
+    Returns:
+        StreamingResponse with text/event-stream content type
+    """
+    if not recommendation_engine:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    try:
+        # Convert user_context to dict if provided
+        user_context_dict = None
+        if request.user_context:
+            user_context_dict = request.user_context.model_dump(exclude_none=True)
+
+        # ✅ SDK Pattern: Stream with AgentRunResponseUpdate handling
+        async def event_generator():
+            """Generate SSE events from agent stream."""
+            try:
+                async for update in recommendation_engine.get_recommendations_stream(
+                    query=request.query,
+                    user_id=request.user_id,
+                    user_context=user_context_dict,
+                    conversation_id=request.conversation_id,
+                ):
+                    # Format as SSE event
+                    event_data = json.dumps(update)
+                    yield f"data: {event_data}\n\n"
+
+                # Send final event to close stream
+                yield "data: {\"type\": \"done\"}\n\n"
+
+            except Exception as e:
+                logger.error(f"Error in stream generator: {e}")
+                error_event = json.dumps({"type": "error", "error": str(e)})
+                yield f"data: {error_event}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Disable nginx buffering
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error initializing streaming: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -204,12 +272,13 @@ async def record_feedback(request: FeedbackRequest):
         raise HTTPException(status_code=503, detail="Service not initialized")
 
     try:
-        feedback_data = {
-            "feedback_type": request.feedback_type,
-            "module_id": request.module_id,
-            "comment": request.comment,
-            "rating": request.rating,
-        }
+        feedback_data = {}
+        if request.module_id:
+            feedback_data["module_id"] = request.module_id
+        if request.comment:
+            feedback_data["comment"] = request.comment
+        if request.rating:
+            feedback_data["rating"] = request.rating
 
         recommendation_engine.record_feedback(
             user_id=request.user_id,
@@ -218,54 +287,17 @@ async def record_feedback(request: FeedbackRequest):
             feedback_data=feedback_data,
         )
 
-        return {"status": "success", "message": "Feedback recorded successfully"}
+        return {
+            "status": "success",
+            "message": "Feedback recorded",
+            "feedback_type": request.feedback_type,
+        }
     except Exception as e:
         logger.error(f"Error recording feedback: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/history/{user_id}")
-async def get_user_history(user_id: str, limit: int = 10):
-    """
-    Get user's recommendation history.
-
-    Args:
-        user_id: User identifier
-        limit: Maximum number of interactions to return
-    """
-    if not recommendation_engine:
-        raise HTTPException(status_code=503, detail="Service not initialized")
-
-    try:
-        history = recommendation_engine.get_user_history(user_id=user_id, limit=limit)
-
-        return {"user_id": user_id, "interactions": history, "count": len(history)}
-    except Exception as e:
-        logger.error(f"Error fetching user history: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/trending")
-async def get_trending_modules(limit: int = 5):
-    """
-    Get trending modules based on user interactions.
-
-    Args:
-        limit: Number of trending modules to return
-    """
-    if not recommendation_engine:
-        raise HTTPException(status_code=503, detail="Service not initialized")
-
-    try:
-        trending = recommendation_engine.get_trending_modules(limit=limit)
-
-        return {"trending_modules": trending, "count": len(trending)}
-    except Exception as e:
-        logger.error(f"Error fetching trending modules: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8000)

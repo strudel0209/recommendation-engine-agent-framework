@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, AsyncIterator
 
 from src.agent_manager import AgentManager
 from src.data_manager import DataManager
@@ -141,7 +141,7 @@ class RecommendationEngine:
         )
 
     # --------------------------------------------------------------------- #
-    # Public API
+    # Public API - Non-streaming
     # --------------------------------------------------------------------- #
     async def get_recommendations_async(
         self,
@@ -151,12 +151,21 @@ class RecommendationEngine:
         conversation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Generate recommendations using agent.
+        Generate recommendations using agent (non-streaming).
+
+        Args:
+            query: Natural language query
+            user_id: User identifier
+            user_context: Optional user context for personalization
+            conversation_id: Optional conversation ID for multi-turn
+
+        Returns:
+            Dict with recommendations and metadata
         """
         logger.info(f"[user={user_id}] Processing recommendation request: {query[:80]}")
 
         try:
-            # Agent does ALL the work: search, validation, formatting
+            # ✅ SDK Pattern: Agent processes everything
             agent_response = await self.agent_manager.process_query(
                 user_query=query,
                 conversation_id=conversation_id,
@@ -177,6 +186,7 @@ class RecommendationEngine:
                 "conversation_id": conv_id,
                 "timestamp": datetime.utcnow().isoformat(),
                 "interaction_type": "recommendation_request",
+                "usage": agent_response.get("usage"),
             }
             self.data_manager.log_interaction(interaction_payload)
 
@@ -184,7 +194,7 @@ class RecommendationEngine:
                 f"[user={user_id}] Generated {len(recommendations)} recommendations"
             )
 
-            # Return agent response as-is (it's already perfect!)
+            # Return agent response with our metadata
             return {
                 "conversation_id": conv_id,
                 "intent": agent_response.get("intent", {}),
@@ -192,12 +202,87 @@ class RecommendationEngine:
                 "implementation_plan": agent_response.get("implementation_plan", ""),
                 "summary": agent_response.get("summary", ""),
                 "timestamp": datetime.utcnow().isoformat(),
+                "usage": agent_response.get("usage"),
             }
 
         except Exception as e:
             logger.error(f"[user={user_id}] Error generating recommendations: {e}")
             raise
 
+    # --------------------------------------------------------------------- #
+    # Public API - Streaming
+    # --------------------------------------------------------------------- #
+    async def get_recommendations_stream(
+        self,
+        query: str,
+        user_id: str,
+        user_context: Optional[Dict[str, Any]] = None,
+        conversation_id: Optional[str] = None,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """
+        Generate recommendations using agent with streaming support.
+
+        Args:
+            query: Natural language query
+            user_id: User identifier
+            user_context: Optional user context for personalization
+            conversation_id: Optional conversation ID for multi-turn
+
+        Yields:
+            Dict containing streaming updates
+        """
+        logger.info(
+            f"[user={user_id}] Processing streaming recommendation request: {query[:80]}"
+        )
+
+        try:
+            # Track for logging
+            final_recommendations = []
+            final_conv_id = conversation_id
+
+            # ✅ SDK Pattern: Stream from agent
+            async for update in self.agent_manager.process_query_stream(
+                user_query=query,
+                conversation_id=conversation_id,
+                user_context=user_context,
+            ):
+                # Forward all updates to client
+                yield update
+
+                # Track completion data for logging
+                if update.get("type") == "complete":
+                    final_conv_id = update.get("conversation_id")
+                    final_recommendations = update.get("recommendations", [])
+                    
+                    # Log interaction
+                    interaction_payload = {
+                        "id": final_conv_id,
+                        "user_id": user_id,
+                        "query": query,
+                        "user_context": user_context or {},
+                        "recommendations": [r["module_id"] for r in final_recommendations],
+                        "conversation_id": final_conv_id,
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "interaction_type": "recommendation_request_stream",
+                        "usage": update.get("usage"),
+                    }
+                    self.data_manager.log_interaction(interaction_payload)
+
+                    logger.info(
+                        f"[user={user_id}] Streaming completed with {len(final_recommendations)} recommendations"
+                    )
+
+        except Exception as e:
+            logger.error(f"[user={user_id}] Error in streaming recommendations: {e}")
+            yield {
+                "type": "error",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+    # --------------------------------------------------------------------- #
+    # Synchronous wrapper
+    # --------------------------------------------------------------------- #
     def get_recommendations(
         self,
         query: str,
@@ -219,6 +304,9 @@ class RecommendationEngine:
             )
         )
 
+    # --------------------------------------------------------------------- #
+    # Feedback
+    # --------------------------------------------------------------------- #
     def record_feedback(
         self,
         user_id: str,
@@ -239,17 +327,17 @@ class RecommendationEngine:
             # Bundle feedback_type and feedback_data into a single dict
             feedback = {
                 "feedback_type": feedback_type,
-                **feedback_data,  # Merge in module_id, comment, rating, etc.
+                **feedback_data,
             }
 
             self.data_manager.log_feedback(
                 interaction_id=interaction_id,
                 user_id=user_id,
-                feedback=feedback,  # ✅ Pass as single dict
+                feedback=feedback,
             )
             logger.info(f"[user={user_id}] Recorded feedback {feedback_type}")
         except Exception as e:
-            logger.error(f"[user={user_id}] Error recording feedback: {e}")
+            logger.error(f"Error recording feedback: {e}")
             raise
 
     def get_user_history(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
