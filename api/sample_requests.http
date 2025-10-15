@@ -1,0 +1,180 @@
+# Sample API Requests for Testing
+# Use with REST client extensions or tools like curl, httpie, or Postman
+
+### Health Check
+GET http://localhost:8000/
+###
+
+GET http://localhost:8000/health
+###
+
+### Basic Recommendation Request
+POST http://localhost:8000/recommend
+Content-Type: application/json
+
+{
+  "query": "I need to reduce energy costs in my low-sized office building",
+  "user_id": "user1013",
+  "user_context": {
+    "building_scale": "low",
+    "license_type": "standard"
+  }
+}
+###
+
+### Recommendation with Existing Modules
+POST http://localhost:8000/recommend
+Content-Type: application/json
+
+{
+  "query": "What other modules would complement my current setup?",
+  "user_id": "user456",
+  "user_context": {
+    "building_scale": "large",
+    "existing_modules": ["energy-analyzer", "hvac-optimizer"],
+    "license_type": "premium"
+  }
+}
+###
+
+### Air Quality Focused Request
+POST http://localhost:8000/recommend
+Content-Type: application/json
+
+{
+  "query": "I want to improve indoor air quality and monitor health metrics",
+  "user_id": "user789",
+  "user_context": {
+    "building_scale": "medium",
+    "license_type": "standard",
+    "goals": ["health", "air_quality"]
+  }
+}
+###
+
+### Predictive Maintenance Request
+POST http://localhost:8000/recommend
+Content-Type: application/json
+
+{
+  "query": "Help me prevent equipment failures and reduce maintenance costs",
+  "user_id": "facility_manager_001",
+  "user_context": {
+    "building_scale": "enterprise",
+    "license_type": "enterprise",
+    "industry": "manufacturing"
+  }
+}
+###
+
+### Sustainability and ESG Request
+POST http://localhost:8000/recommend
+Content-Type: application/json
+
+{
+  "query": "I need to track carbon emissions and achieve sustainability certifications",
+  "user_id": "sustainability_director",
+  "user_context": {
+    "building_scale": "large",
+    "license_type": "premium",
+    "goals": ["carbon_neutral", "green_certification"]
+  }
+}
+###
+
+### Small Building Request (with constraints)
+POST http://localhost:8000/recommend
+Content-Type: application/json
+
+{
+  "query": "Show me modules suitable for a small retail store",
+  "user_id": "small_business_owner",
+  "user_context": {
+    "building_scale": "small",
+    "license_type": "free"
+  }
+}
+###
+
+### Multi-turn Conversation (Follow-up)
+# First, make a request and save the conversation_id from response
+POST http://localhost:8000/recommend
+Content-Type: application/json
+
+{
+  "query": "Show me energy management modules",
+  "user_id": "user123",
+  "conversation_id": null
+}
+###
+
+# Then use the conversation_id for follow-up
+POST http://localhost:8000/recommend
+Content-Type: application/json
+
+{
+  "query": "What about modules that integrate with those for predictive maintenance?",
+  "user_id": "user123",
+  "conversation_id": "REPLACE_WITH_CONVERSATION_ID"
+}
+###
+
+### Record Positive Feedback
+POST http://localhost:8000/feedback
+Content-Type: application/json
+
+{
+  "user_id": "user123",
+  "interaction_id": "REPLACE_WITH_CONVERSATION_ID",
+  "feedback_type": "deployed",
+  "module_id": "energy-analyzer",
+  "rating": 5,
+  "comment": "Exactly what we needed! Reduced costs by 15%"
+}
+###
+
+### Record Click Feedback
+POST http://localhost:8000/feedback
+Content-Type: application/json
+
+{
+  "user_id": "user123",
+  "interaction_id": "REPLACE_WITH_CONVERSATION_ID",
+  "feedback_type": "clicked",
+  "module_id": "ai-failure-prediction"
+}
+###
+
+### Record Dismissal
+POST http://localhost:8000/feedback
+Content-Type: application/json
+
+{
+  "user_id": "user123",
+  "interaction_id": "REPLACE_WITH_CONVERSATION_ID",
+  "feedback_type": "dismissed",
+  "module_id": "some-module-id",
+  "comment": "Not relevant for our use case"
+}
+###
+
+### Get User History
+GET http://localhost:8000/history/user123?limit=10
+###
+
+### Get Trending Modules
+GET http://localhost:8000/trending?limit=5
+###
+
+### Example PowerShell/cURL Commands
+
+# PowerShell
+# $response = Invoke-RestMethod -Uri "http://localhost:8000/recommend" -Method Post -ContentType "application/json" -Body '{"query":"reduce energy costs","user_id":"user123"}'
+
+# cURL
+# curl -X POST http://localhost:8000/recommend \
+#   -H "Content-Type: application/json" \
+#   -d '{"query":"reduce energy costs","user_id":"user123","user_context":{"building_scale":"medium"}}'
+
+# HTTPie
+# http POST localhost:8000/recommend query="reduce energy costs" user_id="user123"

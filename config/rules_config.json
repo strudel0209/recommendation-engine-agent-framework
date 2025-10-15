@@ -1,0 +1,27 @@
+{
+  "scale_equivalents": {
+    "small": "single-building",
+    "low": "single-building",
+    "single": "single-building",
+    "single-building": "single-building",
+    "medium": "multiple-buildings",
+    "multiple": "multiple-buildings",
+    "multiple-buildings": "multiple-buildings",
+    "large": "campus",
+    "campus": "campus",
+    "enterprise": "portfolio",
+    "portfolio": "portfolio",
+    "multi-site": "portfolio"
+  },
+  "license_hierarchy": {
+    "free": 0,
+    "standard": 1,
+    "premium": 2,
+    "enterprise": 3
+  },
+  "validation_settings": {
+    "max_theme_fragmentation": 2,
+    "min_modules_for_theme_check": 3,
+    "warn_on_free_tier_with_premium_license": true
+  }
+}

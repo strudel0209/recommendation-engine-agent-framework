@@ -1,0 +1,60 @@
+[
+  {
+    "id": "predictive-maintenance-suite",
+    "name": "Predictive Maintenance and Asset Health",
+    "description": "Comprehensive suite for predicting equipment failures, optimizing maintenance schedules, and managing spare parts inventory. Extends asset lifecycle and reduces operational disruptions.",
+    "modules": [
+      "ai-failure-prediction",
+      "spares-inventory-optimizer",
+      "asset-health-dashboard"
+    ],
+    "primary_goals": ["predictive-maintenance", "reduce-downtime", "cost-optimization"],
+    "typical_personas": ["facilities-manager", "maintenance-engineer", "operations-director"]
+  },
+  {
+    "id": "energy-management-suite",
+    "name": "Energy Management and Optimization",
+    "description": "Complete energy management solution covering consumption analytics, HVAC optimization, and renewable energy integration. Delivers significant energy cost savings and sustainability improvements.",
+    "modules": [
+      "energy-consumption-analyzer",
+      "hvac-optimizer",
+      "renewable-integration"
+    ],
+    "primary_goals": ["energy-savings", "sustainability", "cost-optimization"],
+    "typical_personas": ["energy-manager", "sustainability-director", "facilities-manager"]
+  },
+  {
+    "id": "space-management-suite",
+    "name": "Space Management and Optimization",
+    "description": "Modern workplace solution for hybrid work environments. Optimizes space utilization through occupancy analytics and flexible booking systems.",
+    "modules": [
+      "occupancy-analytics",
+      "desk-booking-system"
+    ],
+    "primary_goals": ["space-optimization", "hybrid-work-enablement", "employee-experience"],
+    "typical_personas": ["workplace-manager", "hr-director", "facilities-manager"]
+  },
+  {
+    "id": "health-wellbeing-suite",
+    "name": "Health and Wellbeing",
+    "description": "Focus on occupant health and comfort through continuous monitoring and insights. Creates healthier, more productive work environments.",
+    "modules": [
+      "indoor-air-quality",
+      "wellness-dashboard"
+    ],
+    "primary_goals": ["health-wellbeing", "employee-experience", "productivity"],
+    "typical_personas": ["hr-director", "health-safety-officer", "facilities-manager"]
+  },
+  {
+    "id": "sustainability-compliance-suite",
+    "name": "Sustainability and Compliance",
+    "description": "End-to-end sustainability management with automated reporting and real-time carbon tracking. Helps achieve ESG goals and regulatory compliance.",
+    "modules": [
+      "sustainability-reporting",
+      "carbon-tracking",
+      "energy-consumption-analyzer"
+    ],
+    "primary_goals": ["sustainability", "compliance", "carbon-reduction", "net-zero"],
+    "typical_personas": ["sustainability-director", "compliance-officer", "property-manager"]
+  }
+]
